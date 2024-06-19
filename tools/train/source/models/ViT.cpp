@@ -61,7 +61,6 @@ std::shared_ptr<Module> MLP(int in_dim, int mlp_dim) {
 _MLP::_MLP(int in_dim, int mlp_dim) {
     linear0.reset(NN::Linear(in_dim, mlp_dim));
     dropout0.reset(NN::Dropout(0.1));
-    gelu.reset(NN::);
     linear1.reset(NN::Linear(mlp_dim, in_dim));
     dropout1.reset(NN::Dropout(0.1));
 
