@@ -180,20 +180,19 @@ ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidd
     // 2. dropout
     drop_out.reset(NN::Dropout(0.1));
 
-    // 2. encoder_layers
+    // 3. encoder_layers
     // TODO: Double check the encoder_layer
     for (int i=0; i<12; i++) {
         encoder_layers.emplace_back(EncoderBlock());
     }
 
-//    // 3. last_layer_norm. NOTE: Currently we skip LayerNorm temporarily
+    // 4. last_layer_norm. NOTE: Currently we skip LayerNorm temporarily
 
-    // 4. Final Linear Block
+    // 5. Final Linear Block
     // TODO: Double check the parameters of Linear block
-//    linear = Linear(768, 1000, false);
     linear.reset(NN::Linear(768, 1000, false));
 
-    registerModel({conv_proj, linear});
+    registerModel({conv_proj, drop_out, linear});
     registerModel(encoder_layers);
 }
 
