@@ -461,6 +461,17 @@ VARP _PRelu(VARP x, std::vector<float>&& slopes) {
     prelu->main.AsPRelu()->slopeCount = (int)slopes.size();
     return (Variable::create(Expr::create(prelu.get(), {x})));
 }
+
+VARP _Gelu(VARP x, std::vector<float>&& slopes) {
+    std::unique_ptr<OpT> gelu(new OpT);
+    gelu->type                       = OpType_UnaryOp;
+    gelu->main.type                  = OpParameter_UnaryOp;
+    gelu->main.value                 = new UnaryOpT;
+    gelu->main.AsUnaryOp()->opType = UnaryOpOperation_GELU_STANDARD;
+    
+    return (Variable::create(MNN::Express::Expr::create(gelu.get(), {x})));
+}
+
 /*Computes softmax activations.
 Args:
 logits: A non-empty variable. Must be Halide_Type_Float.
