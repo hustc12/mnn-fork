@@ -144,52 +144,57 @@ std::vector<Express::VARP> _MLP::onForward(const std::vector<Express::VARP> &inp
 std::shared_ptr<Module> MLP(int in_dim, int mlp_dim) {
     return std::shared_ptr<Module>(new _MLP(in_dim, mlp_dim));
 }
-
-//// Final Linear Block
-class _Linear : public Module {
-public:
-    _Linear(int in_feature, int out_feature, bool bias);
-    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
-
-    std::shared_ptr<Module> linear_block;
-};
-
-_Linear::_Linear(int in_feature, int out_feature, bool bias) {
-    linear_block.reset(NN::Linear(in_feature, out_feature, bias));
-
-    registerModel({linear_block});
-}
-
-std::vector<Express::VARP> _Linear::onForward(const std::vector<Express::VARP> &inputs) {
-    using namespace Express;
-
-    VARP x = inputs[0];
-    x = linear_block->forward(x);
-    return {x};
-}
-
-std::shared_ptr<Module> Linear(int in_feature, int out_feature, bool bias) {
-    return std::shared_ptr<Module>(new _Linear(in_feature, out_feature, bias));
-}
+//
+////// Final Linear Block
+//class _Linear : public Module {
+//public:
+//    _Linear(int in_feature, int out_feature, bool bias);
+//    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
+//
+//    std::shared_ptr<Module> linear_block;
+//};
+//
+//_Linear::_Linear(int in_feature, int out_feature, bool bias) {
+//    linear_block.reset(NN::Linear(in_feature, out_feature, bias));
+//
+//    registerModel({linear_block});
+//}
+//
+//std::vector<Express::VARP> _Linear::onForward(const std::vector<Express::VARP> &inputs) {
+//    using namespace Express;
+//
+//    VARP x = inputs[0];
+//    x = linear_block->forward(x);
+//    return {x};
+//}
+//
+//std::shared_ptr<Module> Linear(int in_feature, int out_feature, bool bias) {
+//    return std::shared_ptr<Module>(new _Linear(in_feature, out_feature, bias));
+//}
 
 
 ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidden_dim, int mlp_dim) {
 
-    // Setup for `Conv2d` that has been used in `conv_proj`
-
+    // 1. conv_proj
+    // TODO: Double check the encoder_layer
     conv_proj = Conv2d({}, 3, 1);
 
+    // 2. encoder_layers
     // TODO: Double check the encoder_layer
     for (int i=0; i<12; i++) {
         encoder_layers.emplace_back(EncoderBlock());
     }
 
-//    last_layer_norm =
+    // 3. last_layer_norm
+    // TODO: To replace the BN with LN!
+    last_layer_norm.reset(NN::BatchNorm(768)); //outputChannels
 
+    // 4. Final Linear Block
+    // TODO: Double check the parameters of Linear block
+//    linear = Linear(768, 1000, false);
+    linear.reset(NN::Linear(768, 1000, false));
 
-    linear = Linear(768, 1000, false);
-    // reigsterModels
-    registerModel({conv_proj, linear});
+    registerModel({conv_proj, linear, last_layer_norm});
     registerModel(encoder_layers);
 }
 
@@ -199,6 +204,13 @@ std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inpu
     x = conv_proj->forward(x);
 
     // TODO: To chain blocks
+    for (int i=0; i<12; i++) {
+        x = encoder_layers[i]->forward(x);
+    }
+
+    x = last_layer_norm->forward(x);
+    x = linear->forward(x);
+    return {x};
 }
 //////////////////////
 //ResNet::ResNet(int numClasses, ResNetType resNetType) {
