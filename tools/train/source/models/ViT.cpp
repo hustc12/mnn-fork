@@ -185,16 +185,14 @@ ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidd
         encoder_layers.emplace_back(EncoderBlock());
     }
 
-    // 3. last_layer_norm
-    // TODO: To replace the BN with LN!
-    last_layer_norm.reset(NN::BatchNorm(768)); //outputChannels
+//    // 3. last_layer_norm. NOTE: Currently we skip LayerNorm temporarily
 
     // 4. Final Linear Block
     // TODO: Double check the parameters of Linear block
 //    linear = Linear(768, 1000, false);
     linear.reset(NN::Linear(768, 1000, false));
 
-    registerModel({conv_proj, linear, last_layer_norm});
+    registerModel({conv_proj, linear});
     registerModel(encoder_layers);
 }
 
@@ -208,7 +206,8 @@ std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inpu
         x = encoder_layers[i]->forward(x);
     }
 
-    x = last_layer_norm->forward(x);
+//    3. last_layer_norm. NOTE: Currently we skip LayerNorm temporarily
+//    x = last_layer_norm->forward(x);
     x = linear->forward(x);
     return {x};
 }
