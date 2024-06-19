@@ -166,35 +166,6 @@ std::shared_ptr<Module> EncoderBlock(){
     return std::shared_ptr<Module>(new _EncoderBlock());
 }
 
-//
-////// Final Linear Block
-//class _Linear : public Module {
-//public:
-//    _Linear(int in_feature, int out_feature, bool bias);
-//    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
-//
-//    std::shared_ptr<Module> linear_block;
-//};
-//
-//_Linear::_Linear(int in_feature, int out_feature, bool bias) {
-//    linear_block.reset(NN::Linear(in_feature, out_feature, bias));
-//
-//    registerModel({linear_block});
-//}
-//
-//std::vector<Express::VARP> _Linear::onForward(const std::vector<Express::VARP> &inputs) {
-//    using namespace Express;
-//
-//    VARP x = inputs[0];
-//    x = linear_block->forward(x);
-//    return {x};
-//}
-//
-//std::shared_ptr<Module> Linear(int in_feature, int out_feature, bool bias) {
-//    return std::shared_ptr<Module>(new _Linear(in_feature, out_feature, bias));
-//}
-
-
 ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidden_dim, int mlp_dim) {
 
     // 1. conv_proj
