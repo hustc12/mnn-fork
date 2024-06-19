@@ -42,17 +42,6 @@ std::shared_ptr<Module> Conv2d(std::vector<int> inputOutputChannels, int kernelS
     return std::shared_ptr<Module>(new _Conv2d(inputOutputChannels, kernelSize, stride, depthwise));
 }
 
-////// Encoder = dropout + sequential(EncoderBlocks * 12)
-//class _Encoder : public Module{
-//public:
-//    _Encoder();
-//    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
-//    std::shared_ptr<Module> dropout;
-//};
-//
-//std::shared_ptr<Module> Encoder() {
-//    return std::shared_ptr<Module>(new _Encoder());
-//}
 
 //// Attention
 class _Attention : public Module {
