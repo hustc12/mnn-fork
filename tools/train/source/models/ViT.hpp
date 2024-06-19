@@ -23,6 +23,7 @@ public:
     virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
     
     std::shared_ptr<Express::Module> conv_proj;
+    std::shared_ptr<Express::Module> drop_out;
     std::vector<std::shared_ptr<Express::Module> > encoder_layers;
 //    std::shared_ptr<Express::Module> last_layer_norm;
     std::shared_ptr<Express::Module> linear;

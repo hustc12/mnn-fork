@@ -42,18 +42,17 @@ std::shared_ptr<Module> Conv2d(std::vector<int> inputOutputChannels, int kernelS
     return std::shared_ptr<Module>(new _Conv2d(inputOutputChannels, kernelSize, stride, depthwise));
 }
 
-// TODO: Current working
-//// Encoder = dropout + sequential(EncoderBlocks * 12)
-class _Encoder : public Module{
-public:
-    _Encoder();
-    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
-    std::shared_ptr<Module> dropout;
-};
-
-std::shared_ptr<Module> Encoder() {
-    return std::shared_ptr<Module>(new _Encoder());
-}
+////// Encoder = dropout + sequential(EncoderBlocks * 12)
+//class _Encoder : public Module{
+//public:
+//    _Encoder();
+//    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
+//    std::shared_ptr<Module> dropout;
+//};
+//
+//std::shared_ptr<Module> Encoder() {
+//    return std::shared_ptr<Module>(new _Encoder());
+//}
 
 //// EncoderBlock = LayerNorm(Skip) + MultiheadAttention + Dropout + LayerNorm(Skip) + MLPBlock
 class _EncoderBlock:public Module{
@@ -178,6 +177,9 @@ ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidd
     // TODO: Double check the encoder_layer
     conv_proj = Conv2d({}, 3, 1);
 
+    // 2. dropout
+    drop_out.reset(NN::Dropout(0.1));
+
     // 2. encoder_layers
     // TODO: Double check the encoder_layer
     for (int i=0; i<12; i++) {
@@ -199,7 +201,8 @@ std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inpu
     using namespace Express;
     VARP x = inputs[0];
     x = conv_proj->forward(x);
-
+    x = drop_out->forward(x);
+    
     // TODO: To chain blocks
     for (int i=0; i<12; i++) {
         x = encoder_layers[i]->forward(x);
