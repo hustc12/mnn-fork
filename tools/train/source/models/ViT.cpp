@@ -54,22 +54,6 @@ std::shared_ptr<Module> Conv2d(std::vector<int> inputOutputChannels, int kernelS
 //    return std::shared_ptr<Module>(new _Encoder());
 //}
 
-//// EncoderBlock = LayerNorm(Skip) + MultiheadAttention + Dropout + LayerNorm(Skip) + MLPBlock
-class _EncoderBlock:public Module{
-public:
-    _EncoderBlock();
-    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
-};
-
-std::shared_ptr<Module> EncoderBlock(){
-    // LayerNorm
-    // MultiheadAttention
-    // Dropout
-    // LayerNorm
-    // MLPBlock
-    return std::shared_ptr<Module>(new _EncoderBlock());
-}
-
 //// Attention
 class _Attention : public Module {
 public:
@@ -77,10 +61,6 @@ public:
     virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
     std::shared_ptr<Module> matmul0;
 };
-
-std::shared_ptr<Module> Attention(int hidden_dim, int num_heads) {
-    return std::shared_ptr<Module>(new _Attention(hidden_dim, num_heads));
-}
 
 _Attention::_Attention(int hidden_dim, int num_heads) {
     matmul0.reset(NN::Linear(hidden_dim, hidden_dim*3));
@@ -100,8 +80,12 @@ std::vector<Express::VARP> _Attention::onForward(const std::vector<Express::VARP
     k = _Transpose(_Reshape(q, {197, 12, 64}), {1,2,0});
     v = _Transpose(_Reshape(q, {197, 12, 64}), {1,0,2});
     q = _Divide(q, _Const(8, {4}, NCHW));
-    qk = _Softmax()
+    auto qk = _Softmax()
     return {x};
+}
+
+std::shared_ptr<Module> Attention(int hidden_dim, int num_heads) {
+    return std::shared_ptr<Module>(new _Attention(hidden_dim, num_heads));
 }
 
 //// MLPBlock = Linear + GELU + Dropout + Linear + Dropout
@@ -113,7 +97,6 @@ public:
 
     std::shared_ptr<Module> linear0;
     std::shared_ptr<Module> dropout0;
-    std::shared_ptr<Module> gelu;
     std::shared_ptr<Module> linear1;
     std::shared_ptr<Module> dropout1;
 };
@@ -142,6 +125,47 @@ std::vector<Express::VARP> _MLP::onForward(const std::vector<Express::VARP> &inp
 std::shared_ptr<Module> MLP(int in_dim, int mlp_dim) {
     return std::shared_ptr<Module>(new _MLP(in_dim, mlp_dim));
 }
+
+
+//// EncoderBlock = LayerNorm(Skip) + MultiheadAttention + Dropout + LayerNorm(Skip) + MLPBlock
+class _EncoderBlock:public Module{
+public:
+    _EncoderBlock();
+    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
+
+    std::shared_ptr<Module> dropout_encoder_block;
+    std::shared_ptr<Module> attention_block;
+    std::shared_ptr<Module> mlp_block;
+};
+
+// TODO: Current working
+_EncoderBlock::_EncoderBlock() {
+
+    // LayerNorm(Skip)
+    // MultiheadAttention
+    // Dropout
+    // LayerNorm(Skip)
+    // MLPBlock
+    attention_block = Attention(768, 12);
+    dropout_encoder_block.reset(NN::Dropout(0.1));
+    mlp_block = MLP(768, 3072);
+
+    // registerModel
+    registerModel({attention_block, dropout_encoder_block, mlp_block});
+}
+
+std::vector<Express::VARP> _EncoderBlock::onForward(const std::vector<Express::VARP> &inputs) {
+    using namespace Express;
+    VARP x = inputs[0];
+    x = attention_block->forward(x);
+    x = mlp_block->forward(x);
+    return {x};
+}
+
+std::shared_ptr<Module> EncoderBlock(){
+    return std::shared_ptr<Module>(new _EncoderBlock());
+}
+
 //
 ////// Final Linear Block
 //class _Linear : public Module {
