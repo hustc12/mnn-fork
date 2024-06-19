@@ -56,6 +56,7 @@ _Attention::_Attention(int hidden_dim, int num_heads) {
     registerModel({matmul0});
 }
 
+// TODO: Current working
 std::vector<Express::VARP> _Attention::onForward(const std::vector<Express::VARP> &inputs) {
     using namespace Express;
     VARP x = inputs[0];
