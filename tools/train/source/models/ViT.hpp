@@ -18,7 +18,7 @@ class MNN_PUBLIC ViT : public Express::Module {
 public:
     // use tensorflow numClasses = 1001, which label 0 means outlier of the original 1000 classes
     // so you maybe need to add 1 to your true labels, if you are testing with ImageNet dataset
-    ViT(int numClasses = 1001, int patch_size=16, int num_layers=12, int num_heads=12, int hidden_dim=768, int mlp_dim=3072);
+    ViT(int numClasses = 1000, int patch_size=16, int num_layers=12, int num_heads=12, int hidden_dim=768, int mlp_dim=3072);
 
     virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
     

@@ -8,7 +8,42 @@ namespace Model {
 using namespace MNN::Express;
 
 // Draft the ViT structure
-// TODO: Update inputs for Encoder
+
+//// Conv2d
+class _Conv2d : public Module {
+public:
+    _Conv2d(std::vector<int> inputOutputChannels, int kernelSize = 3, int stride = 1, bool depthwise = false);
+    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
+
+    std::shared_ptr<Module> conv;
+};
+
+_Conv2d::_Conv2d(std::vector<int> inputOutputChannels, int kernelSize, int stride, bool depthwise) {
+    int inputChannels = inputOutputChannels[0], outputChannels = inputOutputChannels[1];
+    NN::ConvOption convOption;
+    convOption.kernelSize = {kernelSize, kernelSize};
+    convOption.channel = {inputChannels, outputChannels};
+    convOption.padMode = Express::SAME;
+    convOption.stride = {stride, stride};
+    convOption.depthwise = depthwise;
+    conv.reset(NN::Conv(convOption, false, std::shared_ptr<Initializer>(Initializer::MSRA())));
+
+    registerModel({conv});
+}
+std::vector<Express::VARP> _Conv2d::onForward(const std::vector<Express::VARP> &inputs) {
+    using namespace Express;
+
+    VARP x = inputs[0];
+    x = conv->forward(x);
+    return {x};
+}
+
+std::shared_ptr<Module> Conv2d(std::vector<int> inputOutputChannels, int kernelSize = 3, int stride = 1, bool depthwise = false) {
+    return std::shared_ptr<Module>(new _Conv2d(inputOutputChannels, kernelSize, stride, depthwise));
+}
+
+
+// TODO: Update inputs
 //// Encoder
 class _Encoder : public Module{
 public:
@@ -110,6 +145,23 @@ std::vector<Express::VARP> _MLP::onForward(const std::vector<Express::VARP> &inp
     return {x};
 }
 
+ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidden_dim, int mlp_dim) {
+
+    // Setup for `Conv2d` that has been used in `conv_proj`
+
+    conv_proj = Conv2d({}, 3, 1);
+
+    // reigsterModels
+    registerModel({conv_proj});
+}
+
+std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inputs) {
+    using namespace Express;
+    VARP x = inputs[0];
+    x = conv_proj->forward(x);
+
+    // TODO: To chain blocks
+}
 //////////////////////
 //ResNet::ResNet(int numClasses, ResNetType resNetType) {
 //    std::vector<int> numbers;
