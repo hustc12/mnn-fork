@@ -42,21 +42,20 @@ std::shared_ptr<Module> Conv2d(std::vector<int> inputOutputChannels, int kernelS
     return std::shared_ptr<Module>(new _Conv2d(inputOutputChannels, kernelSize, stride, depthwise));
 }
 
-
-// TODO: Update inputs
-//// Encoder
+// TODO: Current working
+//// Encoder = dropout + sequential(EncoderBlocks * 12)
 class _Encoder : public Module{
 public:
     _Encoder();
     virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
-
+    std::shared_ptr<Module> dropout;
 };
 
 std::shared_ptr<Module> Encoder() {
     return std::shared_ptr<Module>(new _Encoder());
 }
 
-//// EncoderBlock
+//// EncoderBlock = LayerNorm(Skip) + MultiheadAttention + Dropout + LayerNorm(Skip) + MLPBlock
 class _EncoderBlock:public Module{
 public:
     _EncoderBlock();
@@ -106,7 +105,7 @@ std::vector<Express::VARP> _Attention::onForward(const std::vector<Express::VARP
     return {x};
 }
 
-//// MLPBlock
+//// MLPBlock = Linear + GELU + Dropout + Linear + Dropout
 class _MLP : public Module {
 public:
     _MLP(int in_dim, int mlp_dim);
@@ -211,7 +210,7 @@ std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inpu
     x = linear->forward(x);
     return {x};
 }
-//////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //ResNet::ResNet(int numClasses, ResNetType resNetType) {
 //    std::vector<int> numbers;
 //    {
