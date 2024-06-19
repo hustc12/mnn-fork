@@ -15,7 +15,7 @@ public:
     _Conv2d(std::vector<int> inputOutputChannels, int kernelSize = 3, int stride = 1, bool depthwise = false);
     virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
 
-    std::shared_ptr<Module> conv;
+    std::shared_ptr<Module> conv2d;
 };
 
 _Conv2d::_Conv2d(std::vector<int> inputOutputChannels, int kernelSize, int stride, bool depthwise) {
@@ -26,15 +26,15 @@ _Conv2d::_Conv2d(std::vector<int> inputOutputChannels, int kernelSize, int strid
     convOption.padMode = Express::SAME;
     convOption.stride = {stride, stride};
     convOption.depthwise = depthwise;
-    conv.reset(NN::Conv(convOption, false, std::shared_ptr<Initializer>(Initializer::MSRA())));
+    conv2d.reset(NN::Conv(convOption, false, std::shared_ptr<Initializer>(Initializer::MSRA())));
 
-    registerModel({conv});
+    registerModel({conv2d});
 }
 std::vector<Express::VARP> _Conv2d::onForward(const std::vector<Express::VARP> &inputs) {
     using namespace Express;
 
     VARP x = inputs[0];
-    x = conv->forward(x);
+    x = conv2d->forward(x);
     return {x};
 }
 
@@ -120,10 +120,6 @@ public:
     std::shared_ptr<Module> dropout1;
 };
 
-std::shared_ptr<Module> MLP(int in_dim, int mlp_dim) {
-    return std::shared_ptr<Module>(new _MLP(in_dim, mlp_dim));
-}
-
 _MLP::_MLP(int in_dim, int mlp_dim) {
     linear0.reset(NN::Linear(in_dim, mlp_dim));
     dropout0.reset(NN::Dropout(0.1));
@@ -145,14 +141,56 @@ std::vector<Express::VARP> _MLP::onForward(const std::vector<Express::VARP> &inp
     return {x};
 }
 
+std::shared_ptr<Module> MLP(int in_dim, int mlp_dim) {
+    return std::shared_ptr<Module>(new _MLP(in_dim, mlp_dim));
+}
+
+//// Final Linear Block
+class _Linear : public Module {
+public:
+    _Linear(int in_feature, int out_feature, bool bias);
+    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
+
+    std::shared_ptr<Module> linear_block;
+};
+
+_Linear::_Linear(int in_feature, int out_feature, bool bias) {
+    linear_block.reset(NN::Linear(in_feature, out_feature, bias));
+
+    registerModel({linear_block});
+}
+
+std::vector<Express::VARP> _Linear::onForward(const std::vector<Express::VARP> &inputs) {
+    using namespace Express;
+
+    VARP x = inputs[0];
+    x = linear_block->forward(x);
+    return {x};
+}
+
+std::shared_ptr<Module> Linear(int in_feature, int out_feature, bool bias) {
+    return std::shared_ptr<Module>(new _Linear(in_feature, out_feature, bias));
+}
+
+
 ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidden_dim, int mlp_dim) {
 
     // Setup for `Conv2d` that has been used in `conv_proj`
 
     conv_proj = Conv2d({}, 3, 1);
 
+    // TODO: Double check the encoder_layer
+    for (int i=0; i<12; i++) {
+        encoder_layers.emplace_back(EncoderBlock());
+    }
+
+//    last_layer_norm =
+
+
+    linear = Linear(768, 1000, false);
     // reigsterModels
-    registerModel({conv_proj});
+    registerModel({conv_proj, linear});
+    registerModel(encoder_layers);
 }
 
 std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inputs) {
