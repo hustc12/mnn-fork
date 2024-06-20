@@ -133,7 +133,7 @@ _Expanding::_Expanding(std::vector<int> inputOutputChannels, int kernelSize, int
     convOption.pads = {padding, padding};
     convOption.depthwise = depthwise;
 
-    conv2d_expand.reset(NN::Conv(convOption, true, std:shared_ptr<Initializer>(Initializer::MSRA())));
+    conv2d_expand.reset(NN::Conv(convOption, true, std::shared_ptr<Initializer>(Initializer::MSRA())));
     registerModel({conv2d_expand});
 }
 
