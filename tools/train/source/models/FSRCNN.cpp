@@ -64,7 +64,6 @@ _Shrinking::_Shrinking(std::vector<int> inputOutputChannels, int kernelSize, int
     convOption.depthwise = depthwise;
 
     conv2d_shrink.reset(NN::Conv(convOption, true, std::shared_ptr<Initializer>(Initializer::MSRA())));
-
     registerModel({conv2d_shrink});
 }
 
@@ -83,6 +82,38 @@ std::shared_ptr<Module> Shrinking(std::vector<int> inputOutputChannels, int kern
 
 
 //// Expanding
+class _Expanding: public Module {
+public:
+    _Expanding(std::vector<int> inputOutputChannels, int kernelSize = 3, int stride = 1, int padding = 1, bool depthwise = false);
+    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
+
+    std::shared_ptr<Module> conv2d_expand;
+};
+
+_Expanding::_Expanding(std::vector<int> inputOutputChannels, int kernelSize, int stride, int padding,
+                       bool depthwise) {
+    int inChannels = inputOutputChannels[0], outChannels = inputOutputChannels[1];
+    NN::ConvOption convOption;
+    convOption.kernelSize = {kernelSize, kernelSize};
+    convOption.channel = {inChannels, outChannels};
+    convOption.stride = {stride, stride};
+    convOption.pads = {padding, padding};
+    convOption.depthwise = depthwise;
+
+    conv2d_expand.reset(NN::Conv(convOption, true, std:shared_ptr<Initializer>(Initializer::MSRA())));
+    registerModel({conv2d_expand});
+}
+
+std::vector<Express::VARP> _Expanding::onForward(const std::vector<Express::VARP> &inputs) {
+    using namespace Express;
+    VARP x = inputs[0];
+    x = conv2d_expand->forward(x);
+    return {x};
+}
+
+std::shared_ptr<Module> Expanding(std::vector<int> inputOutputChannels, int kernelSize = 3, int stride = 1, int padding = 1, bool depthwise = false) {
+    return std::shared_ptr<Module>(new _Expanding(inputOutputChannels, kernelSize, stride, padding, depthwise));
+}
 
 //// Deconvolution
 
