@@ -16,7 +16,6 @@ public:
     virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
 
     std::shared_ptr<Module> conv2d_fe;
-    std::shared_ptr<Module> prelu; // TODO:
 };
 
 _Feature_Extraction::_Feature_Extraction(std::vector<int> inputOutputChannels, int kernelSize, int stride, int padding, bool depthwise) {
@@ -116,7 +115,40 @@ std::shared_ptr<Module> Expanding(std::vector<int> inputOutputChannels, int kern
 }
 
 //// Deconvolution
+class _Deconvolution: public Module {
+public:
+    _Deconvolution(std::vector<int> inputOutputChannels, int kernelSize = 3, int stride = 1, int padding = 1, int out_padding = 1, bool depthwise = false);
+    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
 
+    std::shared_ptr<Module> deconv;
+};
+
+_Deconvolution::_Deconvolution(std::vector<int> inputOutputChannels, int kernelSize, int stride, int padding,
+                               int out_padding, bool depthwise) {
+    int inChannels = inputOutputChannels[0], outChannels = inputOutputChannels[1];
+    NN::ConvOption convOption;
+    convOption.kernelSize = {kernelSize, kernelSize};
+    convOption.channel = {inChannels, outChannels};
+    convOption.stride = {stride, stride};
+    convOption.pads = {padding, padding};
+
+    // TODO: out_padding?
+    convOption.depthwise = depthwise;
+    deconv.reset(NN::ConvTranspose(convOption, true, std::shared_ptr<Initializer>(Initializer::MSRA())));
+
+    registerModel({deconv});
+}
+std::vector<Express::VARP> _Deconvolution::onForward(const std::vector<Express::VARP> &inputs) {
+    using namespace Express;
+    VARP x = inputs[0];
+    x = deconv->forward(x);
+    return {x};
+}
+
+std::shared_ptr<Module> Deconvolution(std::vector<int> inputOutputChannels, int kernelSize, int stride, int padding,
+                                      int out_padding, bool depthwise) {
+    return std::shared_ptr<Module>(new _Deconvolution(inputOutputChannels, kernelSize, stride, padding, out_padding, depthwise));
+}
 
 /////////////////////////////////////
 //// FSRCNN Model
@@ -127,27 +159,29 @@ FSRCNN::FSRCNN(int num_channels, int d, int s, int m, int upscale_factor) {
     feature_extraction = FeatureExtraction({1, 56}, 5, 1, 2);
 
     // 2. Shrinking
-    drop_out.reset(NN::Dropout(0.1));
+    shrinking = Shrinking({56, 12}, 1, 1, 0);
 
     // 3. Mapping
     // TODO: Double check the encoder_layer
-    for (int i=0; i<12; i++) {
+    for (int i=0; i<m; i++) {
         encoder_layers.emplace_back(EncoderBlock());
     }
 
     // 4. Expanding
+    expanding = Expanding({12, 56}, 1,1,0);
 
     // 5. Deconvolution
-    // TODO: Double check the parameters of Linear block
-    linear.reset(NN::Linear(768, 1000, false));
+    deconvolution = Deconvolution({56, 1}, 9, 3, 4, 2, false);
 
-    registerModel({conv_proj, drop_out, linear});
+    registerModel({feature_extraction, shrinking, expanding, deconvolution});
     registerModel(encoder_layers);
 }
 
 std::vector<Express::VARP> FSRCNN::onForward(const std::vector<Express::VARP> &inputs) {
     using namespace Express;
     VARP x = inputs[0];
+
+    // TODO: PReLU
     x = feature_extraction->forward(x);
     x = shrinking->forward(x);
     for (int i = 0; i < mapping.size(); i++) {
