@@ -128,7 +128,6 @@ public:
     std::shared_ptr<Module> mlp_block;
 };
 
-// TODO: Current working
 _EncoderBlock::_EncoderBlock() {
 
     // LayerNorm(Skip)
