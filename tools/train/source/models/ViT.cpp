@@ -158,11 +158,10 @@ std::shared_ptr<Module> EncoderBlock(){
 ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidden_dim, int mlp_dim) {
 
     // 1. conv_proj
-    // TODO: Double check the encoder_layer
-    conv_proj = Conv2d({}, 3, 1);
+    conv_proj = Conv2d({3, 768}, 16, 16);
 
     // 2. dropout
-    drop_out.reset(NN::Dropout(0.1));
+    drop_out.reset(NN::Dropout(0.0));
 
     // 3. encoder_layers
     // TODO: Double check the encoder_layer
@@ -173,8 +172,7 @@ ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidd
     // 4. last_layer_norm. NOTE: Currently we skip LayerNorm temporarily
 
     // 5. Final Linear Block
-    // TODO: Double check the parameters of Linear block
-    linear.reset(NN::Linear(768, 1000, false));
+    linear.reset(NN::Linear(768, 1000, true));
 
     registerModel({conv_proj, drop_out, linear});
     registerModel(encoder_layers);
@@ -196,78 +194,6 @@ std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inpu
     x = linear->forward(x);
     return {x};
 }
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//ResNet::ResNet(int numClasses, ResNetType resNetType) {
-//    std::vector<int> numbers;
-//    {
-//        auto numbersMap = std::map<ResNetType, std::vector<int>>({
-//            {ResNet18, {2, 2, 2, 2}},
-//            {ResNet34, {3, 4, 6, 3}},
-//            {ResNet50, {3, 4, 6, 3}},
-//            {ResNet101, {3, 4, 23, 3}},
-//            {ResNet152, {3, 8, 36, 3}}
-//        });
-//        numbers = numbersMap[resNetType];
-//    }
-//    std::vector<int> channels({64, 64, 128, 256, 512});
-//    {
-//        if (resNetType != ResNet18 && resNetType != ResNet34) {
-//            channels[0] = 16;
-//        }
-//    }
-//
-//    std::vector<int> strides({1, 2, 2, 2});
-//
-//    firstConv = ConvBnRelu2({3, 64}, 7, 2);
-//    // firstConv = ConvBnRelu2({3, 1}, 7, 2);
-//    for (int i = 0; i < 4; ++i) {
-//        if (resNetType == ResNet18 || resNetType == ResNet34) {
-//            //layers.emplace_back(ConvBnRelu2({inputChannels, expandChannels}, 1));
-//            std::cout << "channels: " << channels[i] << " " << channels[i+1] << std::endl;
-//            residualBlocks.emplace_back(Residule({channels[i], channels[i+1]}, strides[i]));
-//            for (int i = 1; i < numbers[i]; ++i) {
-//                residualBlocks.emplace_back(Residule({channels[i+1], channels[i+1]}, strides[i]));
-//            }
-//        }
-//        // else {
-//        //     x = bottleNeckBlock(x, {channels[i] * 4, channels[i+1], channels[i+1] * 4}, strides[i], numbers[i]);
-//        // }
-//    }
-//    // lastConv = ConvBnRelu2({3, 512}, 1, 1); // reshape FC with Conv1x1
-//    int last_c = 128;
-//    // fc.reset(NN::Linear(last_c, numClasses, true, std::shared_ptr<Initializer>(Initializer::MSRA())));
-//    fc = ConvBnRelu2({512, numClasses}, 1, 1); // reshape FC with Conv1x1
-//    // x = _Conv(0.0f, 0.0f, x, {x->getInfo()->dim[1], numClass}, {1, 1}, VALID, {1, 1}, {1, 1}, 1); // reshape FC with Conv1x1
-//    // registerModel({firstConv, fc});
-//    registerModel({firstConv, fc});
-//    registerModel(residualBlocks);
-//}
-//
-//std::vector<Express::VARP> ResNet::onForward(const std::vector<Express::VARP> &inputs) {
-//    using namespace Express;
-//    VARP x = inputs[0];
-//    std::cout << "forward0 " << x->getInfo()->dim[0] << " " << x->getInfo()->dim[1] << std::endl;
-//    x = firstConv->forward(x);
-//    std::cout << "forward1 " << x->getInfo()->dim[0] << " " << x->getInfo()->dim[1] << " " << x->getInfo()->dim[2] << " " << x->getInfo()->dim[3] << std::endl;
-//    x = _MaxPool(x, {3, 3}, {2, 2}, SAME);
-//    std::cout << "forward2 " << x->getInfo()->dim[0] << " " << x->getInfo()->dim[1] << " " << x->getInfo()->dim[2] << " " << x->getInfo()->dim[3] << std::endl;
-//    for (int i = 0; i < 4; i++) {
-//        x = residualBlocks[i]->forward(x);
-//    }
-//    std::cout << "forwardX " << x->getInfo()->dim[0] << " " << x->getInfo()->dim[1] << " " << x->getInfo()->dim[2] << " " << x->getInfo()->dim[3] << std::endl;
-//
-//    // global avg pooling
-//    x = _AvePool(x, {7, 7}, {1, 1}, VALID);
-//
-//    // x = _Convert(x, NCHW);
-//    // x = _Reshape(x, {0, -1});
-//    std::cout << "forward3 " << x->getInfo()->dim[0] << " " << x->getInfo()->dim[1] << " " << x->getInfo()->dim[2] << " " << x->getInfo()->dim[3] << std::endl;
-//
-//    x = fc->forward(x);
-//    std::cout << "forward4 " << x->getInfo()->dim[0] << " " << x->getInfo()->dim[1] << " " << x->getInfo()->dim[2] << " " << x->getInfo()->dim[3] << std::endl;
-//    x = _Softmax(x, -1);
-//    return {x};
-//}
 
 } // namespace Model
 } // namespace Train
