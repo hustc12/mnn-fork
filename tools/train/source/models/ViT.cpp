@@ -52,7 +52,7 @@ public:
 };
 
 _Attention::_Attention(int hidden_dim, int num_heads) {
-    matmul0.reset(NN::Linear(hidden_dim, hidden_dim*3));
+    matmul0.reset(NN::Linear(hidden_dim, hidden_dim*3, true));
     registerModel({matmul0});
 }
 
@@ -62,6 +62,7 @@ std::vector<Express::VARP> _Attention::onForward(const std::vector<Express::VARP
     VARP x = inputs[0];
 
     x = matmul0->forward(x);
+
     // yy = _Slice(yy, _Const(sliceStartData, {4}, NCHW), _Const(sliceEndData, {4}, NCHW));
     auto q = _Slice(x,                       0, _Const(768, {4}, NCHW));
     auto k = _Slice(x, _Const(768, {4}, NCHW) , _Const(768, {4}, NCHW));
@@ -70,7 +71,9 @@ std::vector<Express::VARP> _Attention::onForward(const std::vector<Express::VARP
     k = _Transpose(_Reshape(q, {197, 12, 64}), {1,2,0});
     v = _Transpose(_Reshape(q, {197, 12, 64}), {1,0,2});
     q = _Divide(q, _Const(8, {4}, NCHW));
-    auto qk = _Softmax()
+
+    auto softmax_qk = _Softmax(_MatMul(q, k));
+    x = _MatMul(softmax_qk, v);
     return {x};
 }
 
@@ -156,7 +159,6 @@ std::shared_ptr<Module> EncoderBlock(){
 }
 
 ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidden_dim, int mlp_dim) {
-
     // 1. conv_proj
     conv_proj = Conv2d({3, 768}, 16, 16);
 
