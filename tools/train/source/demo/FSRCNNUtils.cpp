@@ -55,7 +55,7 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
     auto trainDataset = ImageNoLabelDataset::create(trainImagesFolder, datasetConfig.get());
 //    auto testDataset = ImageNoLabelDataset::create(testImagesFolder, datasetConfig.get());
 
-    const int trainBatchSize = 32;
+    const int trainBatchSize = 1;
     const int trainNumWorkers = 4;
     const int testBatchSize = 10;
     const int testNumWorkers = 0;
@@ -69,7 +69,7 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
     // const int usedSize = 1000;
     // const int testIterations = usedSize / testBatchSize;
 
-    for (int epoch = 0; epoch < 10; ++epoch) {
+    for (int epoch = 0; epoch < 50; ++epoch) {
         model->clearCache();
         exe->gc(Executor::FULL);
         {
@@ -86,13 +86,26 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
 //                                  _Scalar<int>(numClasses), _Scalar<float>(1.0f),
 //                                         _Scalar<float>(0.0f));
 
-//                VARP input = _Convert(example.first[0], NCHW);
-                VARP input = example.first[0];
-                VARP newTarget = example.first[0]; // TODO: To update the target
-//                MNN_PRINT("DEBUGGING INPUT = %p\n", &input);
+////                VARP input = example.first[0];
+////                VARP newTarget = example.first[0]; // TODO: To update the target
+//                VARP input = _Convert(example.first[0], NC4HW4);
+//                VARP input = _Convert (_Const(1.03, {1, 1, resizeHeight, resizeWidth}), NC4HW4);
+//                VARP newTarget = _Convert( _Const(1.03, {1, 1, resizeHeight*3, resizeWidth*3}), NC4HW4);
+
+                VARP input = _Const(1.03, {1, 1, resizeHeight, resizeWidth}, NCHW);
+                VARP newTarget = _Const(1.03, {1, 1, resizeHeight*3, resizeWidth*3}, NCHW);
+
+//                VARP input = _Input({1,1,resizeHeight, resizeWidth});
+//                VARP newTarget = _Input({1,1,resizeHeight*3, resizeWidth*3});
+
                 auto predict = model->forward(input); // NC4HW4
-                auto loss    = _CrossEntropy(input, newTarget);
-                // float rate   = LrScheduler::inv(0.0001, solver->currentStep(), 0.0001, 0.75);
+//                MNN_PRINT("DEBUGGING: input dim size = %d\n", input->getInfo()->dim.size());
+//                MNN_PRINT("DEBUGGING: input dim = (%d, %d, %d, %d)\n", input->getInfo()->dim.at(0), input->getInfo()->dim.at(1), input->getInfo()->dim.at(2), input->getInfo()->dim.at(3));
+//                MNN_PRINT("DEBUGGING: predict dim size = %d\n", predict->getInfo()->dim.size());
+//                MNN_PRINT("DEBUGGING: predict dim = (%d, %d, %d, %d)\n", predict->getInfo()->dim.at(0), predict->getInfo()->dim.at(1), predict->getInfo()->dim.at(2), predict->getInfo()->dim.at(3));
+
+                auto loss    = _MSE(predict, newTarget);
+//                 float rate   = LrScheduler::inv(0.0001, solver->currentStep(), 0.0001, 0.75);
                 float rate = 1e-5;
                 solver->setLearningRate(rate);
                 if (solver->currentStep() % 10 == 0) {
