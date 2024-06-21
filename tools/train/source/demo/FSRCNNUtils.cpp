@@ -53,7 +53,7 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
     std::shared_ptr<ImageDataset::ImageConfig> datasetConfig(ImageDataset::ImageConfig::create(converImagesToFormat, resizeHeight, resizeWidth, scales, means,cropFraction, centerOrRandomCrop));
     bool readAllImagesToMemory = false;
     auto trainDataset = ImageNoLabelDataset::create(trainImagesFolder, datasetConfig.get());
-    auto testDataset = ImageNoLabelDataset::create(testImagesFolder, datasetConfig.get());
+//    auto testDataset = ImageNoLabelDataset::create(testImagesFolder, datasetConfig.get());
 
     const int trainBatchSize = 32;
     const int trainNumWorkers = 4;
@@ -61,10 +61,10 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
     const int testNumWorkers = 0;
 
     auto trainDataLoader = trainDataset.createLoader(trainBatchSize, true, true, trainNumWorkers);
-    auto testDataLoader = testDataset.createLoader(testBatchSize, true, false, testNumWorkers);
+//    auto testDataLoader = testDataset.createLoader(testBatchSize, true, false, testNumWorkers);
 
     const int trainIterations = trainDataLoader->iterNumber();
-    const int testIterations = testDataLoader->iterNumber();
+//    const int testIterations = testDataLoader->iterNumber();
 
     // const int usedSize = 1000;
     // const int testIterations = usedSize / testBatchSize;
@@ -81,54 +81,58 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
                 auto trainData  = trainDataLoader->next();
                 auto example    = trainData[0];
 
-                // Compute One-Hot
-                auto newTarget = _OneHot(_Cast<int32_t>(_Squeeze(example.second[0] + _Scalar<int32_t>(addToLabel), {})),
-                                  _Scalar<int>(numClasses), _Scalar<float>(1.0f),
-                                         _Scalar<float>(0.0f));
+//                // Compute One-Hot
+//                auto newTarget = _OneHot(_Cast<int32_t>(_Squeeze(example.second[0] + _Scalar<int32_t>(addToLabel), {})),
+//                                  _Scalar<int>(numClasses), _Scalar<float>(1.0f),
+//                                         _Scalar<float>(0.0f));
+//                VARP input = example.first[0];
+                VARP newTarget = example.first[0];
 
-                auto predict = model->forward(_Convert(example.first[0], NC4HW4));
-                auto loss    = _CrossEntropy(predict, newTarget);
-                // float rate   = LrScheduler::inv(0.0001, solver->currentStep(), 0.0001, 0.75);
-                float rate = 1e-5;
-                solver->setLearningRate(rate);
-                if (solver->currentStep() % 10 == 0) {
-                    std::cout << "train iteration: " << solver->currentStep();
-                    std::cout << " loss: " << loss->readMap<float>()[0];
-                    std::cout << " lr: " << rate << std::endl;
-                }
-                solver->step(loss);
+                VARP input = _Convert(example.first[0], NCHW);
+                MNN_PRINT("DEBUGGING INPUT = %p\n", &input);
+                auto predict = model->forward(_Convert(example.first[0], NCHW)); // NC4HW4
+//                auto loss    = _CrossEntropy(predict, newTarget);
+//                // float rate   = LrScheduler::inv(0.0001, solver->currentStep(), 0.0001, 0.75);
+//                float rate = 1e-5;
+//                solver->setLearningRate(rate);
+//                if (solver->currentStep() % 10 == 0) {
+//                    std::cout << "train iteration: " << solver->currentStep();
+//                    std::cout << " loss: " << loss->readMap<float>()[0];
+//                    std::cout << " lr: " << rate << std::endl;
+//                }
+//                solver->step(loss);
             }
         }
 
-        int correct = 0;
-        int sampleCount = 0;
-        testDataLoader->reset();
-        model->setIsTraining(false);
-        exe->gc(Executor::PART);
+//        int correct = 0;
+//        int sampleCount = 0;
+//        testDataLoader->reset();
+//        model->setIsTraining(false);
+//        exe->gc(Executor::PART);
 
-        AUTOTIME;
-        for (int i = 0; i < testIterations; i++) {
-            auto data       = testDataLoader->next();
-            auto example    = data[0];
-            auto predict    = model->forward(_Convert(example.first[0], NC4HW4));
-            predict         = _ArgMax(predict, 1); // (N, numClasses) --> (N)
-            auto label = _Squeeze(example.second[0]) + _Scalar<int32_t>(addToLabel);
-            sampleCount += label->getInfo()->size;
-            auto accu       = _Cast<int32_t>(_Equal(predict, label).sum({}));
-            correct += accu->readMap<int32_t>()[0];
-
-            if ((i + 1) % 10 == 0) {
-                std::cout << "test iteration: " << (i + 1) << " ";
-                std::cout << "acc: " << correct << "/" << sampleCount << " = " << float(correct) / sampleCount * 100 << "%";
-                std::cout << std::endl;
-            }
-        }
-        auto accu = (float)correct / testDataLoader->size();
-        // auto accu = (float)correct / usedSize;
-        std::cout << "epoch: " << epoch << "  accuracy: " << accu << std::endl;
+//        AUTOTIME;
+//        for (int i = 0; i < testIterations; i++) {
+//            auto data       = testDataLoader->next();
+//            auto example    = data[0];
+//            auto predict    = model->forward(_Convert(example.first[0], NC4HW4));
+//            predict         = _ArgMax(predict, 1); // (N, numClasses) --> (N)
+//            auto label = _Squeeze(example.second[0]) + _Scalar<int32_t>(addToLabel);
+//            sampleCount += label->getInfo()->size;
+//            auto accu       = _Cast<int32_t>(_Equal(predict, label).sum({}));
+//            correct += accu->readMap<int32_t>()[0];
+//
+//            if ((i + 1) % 10 == 0) {
+//                std::cout << "test iteration: " << (i + 1) << " ";
+//                std::cout << "acc: " << correct << "/" << sampleCount << " = " << float(correct) / sampleCount * 100 << "%";
+//                std::cout << std::endl;
+//            }
+//        }
+//        auto accu = (float)correct / testDataLoader->size();
+//        // auto accu = (float)correct / usedSize;
+//        std::cout << "epoch: " << epoch << "  accuracy: " << accu << std::endl;
 
         {
-            auto forwardInput = _Input({1, 3, resizeHeight, resizeWidth}, NC4HW4);
+            auto forwardInput = _Input({1, 3, resizeHeight, resizeWidth}, NCHW); //NC4HW4
             forwardInput->setName("data");
             auto predict = model->forward(forwardInput);
             Transformer::turnModelToInfer()->onExecute({predict});
