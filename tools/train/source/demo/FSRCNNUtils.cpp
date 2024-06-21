@@ -91,16 +91,16 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
                 VARP input = _Convert(example.first[0], NCHW);
                 MNN_PRINT("DEBUGGING INPUT = %p\n", &input);
                 auto predict = model->forward(_Convert(example.first[0], NCHW)); // NC4HW4
-//                auto loss    = _CrossEntropy(predict, newTarget);
-//                // float rate   = LrScheduler::inv(0.0001, solver->currentStep(), 0.0001, 0.75);
-//                float rate = 1e-5;
-//                solver->setLearningRate(rate);
-//                if (solver->currentStep() % 10 == 0) {
-//                    std::cout << "train iteration: " << solver->currentStep();
-//                    std::cout << " loss: " << loss->readMap<float>()[0];
-//                    std::cout << " lr: " << rate << std::endl;
-//                }
-//                solver->step(loss);
+                auto loss    = _CrossEntropy(predict, newTarget);
+                // float rate   = LrScheduler::inv(0.0001, solver->currentStep(), 0.0001, 0.75);
+                float rate = 1e-5;
+                solver->setLearningRate(rate);
+                if (solver->currentStep() % 10 == 0) {
+                    std::cout << "train iteration: " << solver->currentStep();
+                    std::cout << " loss: " << loss->readMap<float>()[0];
+                    std::cout << " lr: " << rate << std::endl;
+                }
+                solver->step(loss);
             }
         }
 
