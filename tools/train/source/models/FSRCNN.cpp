@@ -23,7 +23,7 @@ _Feature_Extraction::_Feature_Extraction(std::vector<int> inputOutputChannels, i
     NN::ConvOption convOption;
     convOption.kernelSize = {kernelSize, kernelSize};
     convOption.channel = {inputChannels, outputChannels};
-//    convOption.padMode = Express::SAME;
+    convOption.padMode = Express::SAME;
     convOption.stride = {stride, stride};
     convOption.pads = {padding, padding};
     convOption.depthwise = depthwise;
@@ -94,6 +94,7 @@ _MappingBlock::_MappingBlock(std::vector<int> inputOutputChannels, int kernelSiz
     convOption.kernelSize = {kernelSize, kernelSize};
     convOption.channel = {inChannels, outChannels};
     convOption.stride = {stride, stride};
+    convOption.padMode = Express::SAME;
     convOption.pads = {padding, padding};
     convOption.depthwise = depthwise;
 
@@ -164,6 +165,8 @@ _Deconvolution::_Deconvolution(std::vector<int> inputOutputChannels, int kernelS
     convOption.kernelSize = {kernelSize, kernelSize};
     convOption.channel = {inChannels, outChannels};
     convOption.stride = {stride, stride};
+    convOption.padMode = Express::SAME;
+//    convOption.pads = {padding, padding, out_padding, out_padding};
     convOption.pads = {padding, padding};
 
     // TODO: out_padding?
@@ -203,7 +206,7 @@ FSRCNN::FSRCNN(int num_channels, int d, int s, int m, int upscale_factor) {
     expanding = Expanding({12, 56}, 1,1,0);
 
     // 5. Deconvolution
-    deconvolution = Deconvolution({56, 1}, 9, 3, 4, 2, false);
+    deconvolution = Deconvolution({56, 1}, 9, 3, 2, 2, false);
 
     registerModel({feature_extraction, shrinking, expanding, deconvolution});
     registerModel(mapping);
@@ -212,16 +215,26 @@ FSRCNN::FSRCNN(int num_channels, int d, int s, int m, int upscale_factor) {
 std::vector<Express::VARP> FSRCNN::onForward(const std::vector<Express::VARP> &inputs) {
     using namespace Express;
     VARP x = inputs[0];
+//    MNN_PRINT("DEBUGGING: input dim = (%d, %d, %d, %d)\n", x->getInfo()->dim.at(0), x->getInfo()->dim.at(1), x->getInfo()->dim.at(2), x->getInfo()->dim.at(3));
 
     // TODO: PReLU
 //    MNN_PRINT("DEBUGGING: Start FSRCNN forwarding!\n");
     x = feature_extraction->forward(x);
+//    MNN_PRINT("DEBUGGING: after feature_extract dim = (%d, %d, %d, %d)\n", x->getInfo()->dim.at(0), x->getInfo()->dim.at(1), x->getInfo()->dim.at(2), x->getInfo()->dim.at(3));
+
     x = shrinking->forward(x);
+//    MNN_PRINT("DEBUGGING: after shrinking dim = (%d, %d, %d, %d)\n", x->getInfo()->dim.at(0), x->getInfo()->dim.at(1), x->getInfo()->dim.at(2), x->getInfo()->dim.at(3));
+
     for (int i = 0; i < mapping.size(); i++) {
         x = mapping[i]->forward(x);
     }
+//    MNN_PRINT("DEBUGGING: after mapping dim = (%d, %d, %d, %d)\n", x->getInfo()->dim.at(0), x->getInfo()->dim.at(1), x->getInfo()->dim.at(2), x->getInfo()->dim.at(3));
+
     x = expanding->forward(x);
+//    MNN_PRINT("DEBUGGING: after expanding dim = (%d, %d, %d, %d)\n", x->getInfo()->dim.at(0), x->getInfo()->dim.at(1), x->getInfo()->dim.at(2), x->getInfo()->dim.at(3));
+
     x = deconvolution->forward(x);
+//    MNN_PRINT("DEBUGGING: final predict dim = (%d, %d, %d, %d)\n", x->getInfo()->dim.at(0), x->getInfo()->dim.at(1), x->getInfo()->dim.at(2), x->getInfo()->dim.at(3));
     return {x};
 }
 
