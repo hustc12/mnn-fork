@@ -192,7 +192,7 @@ std::shared_ptr<Module> Deconvolution(std::vector<int> inputOutputChannels, int 
 FSRCNN::FSRCNN(int num_channels, int d, int s, int m, int upscale_factor) {
 
     // 1. Feature Extraction
-    feature_extraction = FeatureExtraction({1, 56}, 5, 1, 2);
+    feature_extraction = FeatureExtraction({num_channels, 56}, 5, 1, 2);
 
     // 2. Shrinking
     shrinking = Shrinking({56, 12}, 1, 1, 0);
@@ -206,7 +206,7 @@ FSRCNN::FSRCNN(int num_channels, int d, int s, int m, int upscale_factor) {
     expanding = Expanding({12, 56}, 1,1,0);
 
     // 5. Deconvolution
-    deconvolution = Deconvolution({56, 1}, 9, 3, 2, 2, false);
+    deconvolution = Deconvolution({56, num_channels}, 9, 3, 4, 2, false);
 
     registerModel({feature_extraction, shrinking, expanding, deconvolution});
     registerModel(mapping);
@@ -218,7 +218,6 @@ std::vector<Express::VARP> FSRCNN::onForward(const std::vector<Express::VARP> &i
 //    MNN_PRINT("DEBUGGING: input dim = (%d, %d, %d, %d)\n", x->getInfo()->dim.at(0), x->getInfo()->dim.at(1), x->getInfo()->dim.at(2), x->getInfo()->dim.at(3));
 
     // TODO: PReLU
-//    MNN_PRINT("DEBUGGING: Start FSRCNN forwarding!\n");
     x = feature_extraction->forward(x);
 //    MNN_PRINT("DEBUGGING: after feature_extract dim = (%d, %d, %d, %d)\n", x->getInfo()->dim.at(0), x->getInfo()->dim.at(1), x->getInfo()->dim.at(2), x->getInfo()->dim.at(3));
 
