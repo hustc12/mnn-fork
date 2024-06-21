@@ -69,7 +69,7 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
     // const int usedSize = 1000;
     // const int testIterations = usedSize / testBatchSize;
 
-    for (int epoch = 0; epoch < 1; ++epoch) {
+    for (int epoch = 0; epoch < 10; ++epoch) {
         model->clearCache();
         exe->gc(Executor::FULL);
         {
@@ -85,13 +85,13 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
 //                auto newTarget = _OneHot(_Cast<int32_t>(_Squeeze(example.second[0] + _Scalar<int32_t>(addToLabel), {})),
 //                                  _Scalar<int>(numClasses), _Scalar<float>(1.0f),
 //                                         _Scalar<float>(0.0f));
-//                VARP input = example.first[0];
-                VARP newTarget = example.first[0];
 
-                VARP input = _Convert(example.first[0], NCHW);
-                MNN_PRINT("DEBUGGING INPUT = %p\n", &input);
-                auto predict = model->forward(_Convert(example.first[0], NCHW)); // NC4HW4
-                auto loss    = _CrossEntropy(predict, newTarget);
+//                VARP input = _Convert(example.first[0], NCHW);
+                VARP input = example.first[0];
+                VARP newTarget = example.first[0]; // TODO: To update the target
+//                MNN_PRINT("DEBUGGING INPUT = %p\n", &input);
+                auto predict = model->forward(input); // NC4HW4
+                auto loss    = _CrossEntropy(input, newTarget);
                 // float rate   = LrScheduler::inv(0.0001, solver->currentStep(), 0.0001, 0.75);
                 float rate = 1e-5;
                 solver->setLearningRate(rate);
