@@ -68,6 +68,7 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
 
     // const int usedSize = 1000;
     // const int testIterations = usedSize / testBatchSize;
+    int channels = 1;
 
     for (int epoch = 0; epoch < 50; ++epoch) {
         model->clearCache();
@@ -92,8 +93,8 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
 //                VARP input = _Convert (_Const(1.03, {1, 1, resizeHeight, resizeWidth}), NC4HW4);
 //                VARP newTarget = _Convert( _Const(1.03, {1, 1, resizeHeight*3, resizeWidth*3}), NC4HW4);
 
-                VARP input = _Const(1.03, {1, 1, resizeHeight, resizeWidth}, NCHW);
-                VARP newTarget = _Const(1.03, {1, 1, resizeHeight*3, resizeWidth*3}, NCHW);
+                VARP input = _Const(1.03, {1, channels, resizeHeight, resizeWidth}, NCHW);
+                VARP newTarget = _Const(1.03, {1, channels, resizeHeight*3, resizeWidth*3}, NCHW);
 
 //                VARP input = _Input({1,1,resizeHeight, resizeWidth});
 //                VARP newTarget = _Input({1,1,resizeHeight*3, resizeWidth*3});
@@ -144,15 +145,15 @@ void FSRCNNUtils::train(std::shared_ptr<Module> model, const int numClasses, con
 //        // auto accu = (float)correct / usedSize;
 //        std::cout << "epoch: " << epoch << "  accuracy: " << accu << std::endl;
 
-        {
-            auto forwardInput = _Input({1, 3, resizeHeight, resizeWidth}, NCHW); //NC4HW4
-            forwardInput->setName("data");
-            auto predict = model->forward(forwardInput);
-            Transformer::turnModelToInfer()->onExecute({predict});
-            predict->setName("prob");
-            std::string fileName = "temp.FSRCNN.mnn";
-            Variable::save({predict}, fileName.c_str());
-//            ConvertToFullQuant::convert(fileName);
-        }
+//        {
+//            auto forwardInput = _Input({1, channels, resizeHeight, resizeWidth}, NCHW); //NC4HW4
+//            forwardInput->setName("data");
+//            auto predict = model->forward(forwardInput);
+//            Transformer::turnModelToInfer()->onExecute({predict});
+//            predict->setName("prob");
+//            std::string fileName = "temp.FSRCNN.mnn";
+//            Variable::save({predict}, fileName.c_str());
+////            ConvertToFullQuant::convert(fileName);
+//        }
     }
 }
