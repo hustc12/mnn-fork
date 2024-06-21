@@ -28,7 +28,7 @@ function build_android_bench() {
     -DANDROID_NATIVE_API_LEVEL=android-21  \
     -DMNN_BUILD_FOR_ANDROID_COMMAND=true \
     -DNATIVE_LIBRARY_OUTPUT=. -DNATIVE_INCLUDE_OUTPUT=.
-    make -j8
+    make -j
 }
 
 function bench_android() {
