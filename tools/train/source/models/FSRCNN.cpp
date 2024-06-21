@@ -214,6 +214,7 @@ std::vector<Express::VARP> FSRCNN::onForward(const std::vector<Express::VARP> &i
     VARP x = inputs[0];
 
     // TODO: PReLU
+//    MNN_PRINT("DEBUGGING: Start FSRCNN forwarding!\n");
     x = feature_extraction->forward(x);
     x = shrinking->forward(x);
     for (int i = 0; i < mapping.size(); i++) {
