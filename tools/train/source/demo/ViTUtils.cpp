@@ -34,7 +34,7 @@ using namespace MNN::Train;
 
 void ViTUtils::train(std::shared_ptr<Module> model, const int numClasses, const int addToLabel,
                                 std::string trainImagesFolder,
-                                std::string testImagesFolder, const int quantBits) {
+                                std::string trainImageTxt, const int quantBits) {
     auto exe = Executor::getGlobalExecutor();
     BackendConfig config;
     exe->setGlobalExecutorConfig(MNN_FORWARD_OPENCL, config, 4);
@@ -52,7 +52,7 @@ void ViTUtils::train(std::shared_ptr<Module> model, const int numClasses, const 
     bool centerOrRandomCrop = false; // true for random crop
     std::shared_ptr<ImageDataset::ImageConfig> datasetConfig(ImageDataset::ImageConfig::create(converImagesToFormat, resizeHeight, resizeWidth, scales, means,cropFraction, centerOrRandomCrop));
     bool readAllImagesToMemory = false;
-    auto trainDataset = ImageNoLabelDataset::create(trainImagesFolder, datasetConfig.get());
+    auto trainDataset = ImageDataset::create(trainImagesFolder, trainImageTxt, datasetConfig.get());
 //    auto testDataset = ImageNoLabelDataset::create(testImagesFolder, datasetConfig.get());
 
     const int trainBatchSize = 1;
@@ -80,21 +80,18 @@ void ViTUtils::train(std::shared_ptr<Module> model, const int numClasses, const 
                 auto trainData  = trainDataLoader->next();
                 auto example    = trainData[0];
 
-//                // Compute One-Hot
-//                auto newTarget = _OneHot(_Cast<int32_t>(_Squeeze(example.second[0] + _Scalar<int32_t>(addToLabel), {})),
-//                                  _Scalar<int>(numClasses), _Scalar<float>(1.0f),
-//                                         _Scalar<float>(0.0f));
+                // Compute One-Hot
+                auto newTarget = _OneHot(_Cast<int32_t>(_Squeeze(example.second[0] + _Scalar<int32_t>(addToLabel), {})),
+                                  _Scalar<int>(numClasses), _Scalar<float>(1.0f),
+                                         _Scalar<float>(0.0f));
 
-                VARP input = _Const(1.03, {1, channels, resizeHeight, resizeWidth}, NCHW);
-                VARP newTarget = _Const(1.03, {1, channels, resizeHeight*3, resizeWidth*3}, NCHW);
-
-                auto predict = model->forward(input); // NC4HW4
+                auto predict = model->forward(_Convert(example.first[0], NC4HW4)); // NC4HW4
 //                MNN_PRINT("DEBUGGING: input dim size = %d\n", input->getInfo()->dim.size());
 //                MNN_PRINT("DEBUGGING: input dim = (%d, %d, %d, %d)\n", input->getInfo()->dim.at(0), input->getInfo()->dim.at(1), input->getInfo()->dim.at(2), input->getInfo()->dim.at(3));
 //                MNN_PRINT("DEBUGGING: predict dim size = %d\n", predict->getInfo()->dim.size());
 //                MNN_PRINT("DEBUGGING: predict dim = (%d, %d, %d, %d)\n", predict->getInfo()->dim.at(0), predict->getInfo()->dim.at(1), predict->getInfo()->dim.at(2), predict->getInfo()->dim.at(3));
 
-                auto loss    = _MSE(predict, newTarget);
+                auto loss    = _CrossEntropy(predict, newTarget);
 //                 float rate   = LrScheduler::inv(0.0001, solver->currentStep(), 0.0001, 0.75);
                 float rate = 1e-5;
                 solver->setLearningRate(rate);

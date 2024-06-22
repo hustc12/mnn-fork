@@ -30,20 +30,18 @@ class ViTTrain : public DemoUnit {
 public:
     virtual int run(int argc, const char* argv[]) override {
         if (argc < 3) {
-            std::cout << "usage: ./runTrainDemo.out ViTTrain path/to/train/images/ path/to/test/images/" << std::endl;
+            std::cout << "usage: ./runTrainDemo.out ViTTrain path/to/train/images/ path/to/train/images/txt" << std::endl;
             return 0;
         }
         // global random number generator, should invoke before construct the model and dataset
         RandomGenerator::generator(17);
 
         std::string trainImagesFolder = argv[1];
-//        std::string trainImagesTxt = argv[2];
-        std::string testImagesFolder = argv[2];
-//        std::string testImagesTxt = argv[4];
+        std::string trainImagesTxt = argv[2];
 
         std::shared_ptr<Module> model(new ViT);
 
-        ViTUtils::train(model, 1001, 1, trainImagesFolder, testImagesFolder);
+        ViTUtils::train(model, 1001, 1, trainImagesFolder, trainImagesTxt);
 
         return 0;
     }
