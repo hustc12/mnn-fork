@@ -61,10 +61,8 @@ void ViTUtils::train(std::shared_ptr<Module> model, const int numClasses, const 
     const int testNumWorkers = 0;
 
     auto trainDataLoader = trainDataset.createLoader(trainBatchSize, true, true, trainNumWorkers);
-//    auto testDataLoader = testDataset.createLoader(testBatchSize, true, false, testNumWorkers);
 
     const int trainIterations = trainDataLoader->iterNumber();
-//    const int testIterations = testDataLoader->iterNumber();
 
     // const int usedSize = 1000;
     // const int testIterations = usedSize / testBatchSize;
@@ -87,17 +85,8 @@ void ViTUtils::train(std::shared_ptr<Module> model, const int numClasses, const 
 //                                  _Scalar<int>(numClasses), _Scalar<float>(1.0f),
 //                                         _Scalar<float>(0.0f));
 
-////                VARP input = example.first[0];
-////                VARP newTarget = example.first[0]; // TODO: To update the target
-//                VARP input = _Convert(example.first[0], NC4HW4);
-//                VARP input = _Convert (_Const(1.03, {1, 1, resizeHeight, resizeWidth}), NC4HW4);
-//                VARP newTarget = _Convert( _Const(1.03, {1, 1, resizeHeight*3, resizeWidth*3}), NC4HW4);
-
                 VARP input = _Const(1.03, {1, channels, resizeHeight, resizeWidth}, NCHW);
                 VARP newTarget = _Const(1.03, {1, channels, resizeHeight*3, resizeWidth*3}, NCHW);
-
-//                VARP input = _Input({1,1,resizeHeight, resizeWidth});
-//                VARP newTarget = _Input({1,1,resizeHeight*3, resizeWidth*3});
 
                 auto predict = model->forward(input); // NC4HW4
 //                MNN_PRINT("DEBUGGING: input dim size = %d\n", input->getInfo()->dim.size());
@@ -117,43 +106,5 @@ void ViTUtils::train(std::shared_ptr<Module> model, const int numClasses, const 
                 solver->step(loss);
             }
         }
-
-//        int correct = 0;
-//        int sampleCount = 0;
-//        testDataLoader->reset();
-//        model->setIsTraining(false);
-//        exe->gc(Executor::PART);
-
-//        AUTOTIME;
-//        for (int i = 0; i < testIterations; i++) {
-//            auto data       = testDataLoader->next();
-//            auto example    = data[0];
-//            auto predict    = model->forward(_Convert(example.first[0], NC4HW4));
-//            predict         = _ArgMax(predict, 1); // (N, numClasses) --> (N)
-//            auto label = _Squeeze(example.second[0]) + _Scalar<int32_t>(addToLabel);
-//            sampleCount += label->getInfo()->size;
-//            auto accu       = _Cast<int32_t>(_Equal(predict, label).sum({}));
-//            correct += accu->readMap<int32_t>()[0];
-//
-//            if ((i + 1) % 10 == 0) {
-//                std::cout << "test iteration: " << (i + 1) << " ";
-//                std::cout << "acc: " << correct << "/" << sampleCount << " = " << float(correct) / sampleCount * 100 << "%";
-//                std::cout << std::endl;
-//            }
-//        }
-//        auto accu = (float)correct / testDataLoader->size();
-//        // auto accu = (float)correct / usedSize;
-//        std::cout << "epoch: " << epoch << "  accuracy: " << accu << std::endl;
-
-//        {
-//            auto forwardInput = _Input({1, channels, resizeHeight, resizeWidth}, NCHW); //NC4HW4
-//            forwardInput->setName("data");
-//            auto predict = model->forward(forwardInput);
-//            Transformer::turnModelToInfer()->onExecute({predict});
-//            predict->setName("prob");
-//            std::string fileName = "temp.ViT.mnn";
-//            Variable::save({predict}, fileName.c_str());
-////            ConvertToFullQuant::convert(fileName);
-//        }
     }
 }
