@@ -1,202 +1,226 @@
+//
+// Created by huzq85 on 6/23/24.
+//
 #include <algorithm>
 #include <iostream>
 #include "ViT.hpp"
+#include <MNN/expr/ExprCreator.hpp>
+
+#include <MNN/expr/Expr.hpp>
+#include <MNN/expr/ExprCreator.hpp>
+#include <MNN/expr/Module.hpp>
+#include <cmath>
+#include <iostream>
+#include <random>
 
 namespace MNN {
-namespace Train {
-namespace Model {
-using namespace MNN::Express;
+    namespace Train {
+        namespace Model {
 
-// Draft the ViT structure
+            using namespace MNN::Express;
 
-//// Conv2d
-class _Conv2d : public Module {
-public:
-    _Conv2d(std::vector<int> inputOutputChannels, int kernelSize = 3, int stride = 1, bool depthwise = false);
-    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
+            class PatchEmbedding : public Module {
+            public:
+                PatchEmbedding(int img_size, int patch_size, int in_channels, int embed_dim) {
+                    mImgSize = img_size;
+                    mPatchSize = patch_size;
+                    mInChannels = in_channels;
+                    mEmbedDim = embed_dim;
+                    int num_patches = (img_size / patch_size) * (img_size / patch_size);
+                    cls_token = _Const(0.0f, {1, 1, embed_dim}, NCHW);
+                    pos_embedding = _Const(0.0f, {1, num_patches + 1, embed_dim}, NCHW);
 
-    std::shared_ptr<Module> conv2d;
-};
+//                    patch_proj = _Conv({in_channels, embed_dim, patch_size, patch_size}, {embed_dim}, {patch_size, patch_size});
+                    int inputChannels = in_channels, outputChannels = embed_dim;
+                    NN::ConvOption convOption;
+                    convOption.kernelSize = {patch_size, patch_size};
+                    convOption.channel = {inputChannels, outputChannels};
+                    convOption.padMode = Express::SAME;
+                    convOption.stride = {16, 16};
+                    convOption.depthwise = false;
+                    patch_proj.reset(NN::Conv(convOption, false, std::shared_ptr<Initializer>(Initializer::MSRA())));
 
-_Conv2d::_Conv2d(std::vector<int> inputOutputChannels, int kernelSize, int stride, bool depthwise) {
-    int inputChannels = inputOutputChannels[0], outputChannels = inputOutputChannels[1];
-    NN::ConvOption convOption;
-    convOption.kernelSize = {kernelSize, kernelSize};
-    convOption.channel = {inputChannels, outputChannels};
-    convOption.padMode = Express::SAME;
-    convOption.stride = {stride, stride};
-    convOption.depthwise = depthwise;
-    conv2d.reset(NN::Conv(convOption, false, std::shared_ptr<Initializer>(Initializer::MSRA())));
+                    registerModel({patch_proj});
+                }
 
-    registerModel({conv2d});
-}
-std::vector<Express::VARP> _Conv2d::onForward(const std::vector<Express::VARP> &inputs) {
-    using namespace Express;
+                virtual std::vector<Express::VARP>  onForward(const std::vector<Express::VARP> &inputs) {
+                    using namespace std;
+                    VARP x = inputs[0];
+                    int batch_size = x->getInfo()->dim[0];
+                    //cout << "DEBUGGING: batch_size = " << batch_size << endl;
+                    // Patchify the input image
+                    VARP patches = patch_proj->forward(x);
+                    //cout << endl << "DEBUGGING: x dim size1 = " << patches->getInfo()->dim.size() << endl;
+                    //cout << "DEBUGGING: x shape = " << patches->getInfo()->dim.at(0) << " " << patches->getInfo()->dim.at(1) << " " << patches->getInfo()->dim.at(2) << " " << patches->getInfo()->dim.at(3) << endl;
 
-    VARP x = inputs[0];
-    x = conv2d->forward(x);
-    return {x};
-}
+                    patches = _Reshape(patches, {batch_size, -1, mEmbedDim});
+                    //cout << endl << "DEBUGGING: x dim size1 = " << patches->getInfo()->dim.size() << endl;
+                    //cout << "DEBUGGING: x shape = " << patches->getInfo()->dim.at(0) << " " << patches->getInfo()->dim.at(1) << " " << patches->getInfo()->dim.at(2) << " " << endl;
 
-std::shared_ptr<Module> Conv2d(std::vector<int> inputOutputChannels, int kernelSize = 3, int stride = 1, bool depthwise = false) {
-    return std::shared_ptr<Module>(new _Conv2d(inputOutputChannels, kernelSize, stride, depthwise));
-}
+                    // Add the classification token
+//                    VARP cls_tokens = _Tile(cls_token, _Const(1.0, {batch_size, 1, 1}));
+//                    //cout << endl << "DEBUGGING: cls_tokens dim size1 = " << cls_tokens->getInfo()->dim.size() << endl;
+//                    //cout << "DEBUGGING: x shape = " << cls_tokens->getInfo()->dim.at(0) << " " << cls_tokens->getInfo()->dim.at(1) << " " << cls_tokens->getInfo()->dim.at(2) << " " << endl;
+
+                    patches = _Concat({cls_token, patches}, 1);
+                    //cout << endl << "DEBUGGING: cls_tokens dim size1 = " << patches->getInfo()->dim.size() << endl;
+                    //cout << "DEBUGGING: x shape = " << patches->getInfo()->dim.at(0) << " " << patches->getInfo()->dim.at(1) << " " << patches->getInfo()->dim.at(2) << " " << endl;
+
+                    // Add position embeddings
+                    patches = patches + pos_embedding;
+                    return {patches};
+                }
+
+            private:
+                int mImgSize;
+                int mPatchSize;
+                int mInChannels;
+                int mEmbedDim;
+                std::shared_ptr<Module> patch_proj;
+                VARP cls_token;
+                VARP pos_embedding;
+            };
+
+            class MultiHeadAttention : public Module {
+            public:
+                MultiHeadAttention(int embed_dim, int num_heads) {
+                    mEmbedDim = embed_dim;
+                    mNumHeads = num_heads;
+                    mHeadDim = embed_dim / num_heads;
+
+                    queryProj.reset(NN::Linear(embed_dim, embed_dim, true));
+                    keyProj.reset(NN::Linear(embed_dim, embed_dim, true));
+                    valueProj.reset(NN::Linear(embed_dim, embed_dim, true));
+                    outProj.reset(NN::Linear(embed_dim, embed_dim, true));
+
+                    registerModel({queryProj, keyProj, valueProj, outProj});
+                }
+
+                virtual std::vector<Express::VARP>  onForward(const std::vector<Express::VARP> &inputs) {
+                    VARP x = inputs[0];
+                    int batch_size = x->getInfo()->dim[0];
+                    int seq_len = x->getInfo()->dim[1];
+
+                    // Linear projections
+                    VARP queries = queryProj->forward(_Reshape(x, {batch_size * seq_len, mEmbedDim}));
+                    queries = _Reshape(queries, {batch_size, seq_len, mNumHeads, mHeadDim});
+                    queries = _Transpose(queries, {0, 2, 1, 3});
+
+                    VARP keys = keyProj->forward(_Reshape(x, {batch_size * seq_len, mEmbedDim}));
+                    keys = _Reshape(keys, {batch_size, seq_len, mNumHeads, mHeadDim});
+                    keys = _Transpose(keys, {0, 2, 1, 3});
+
+                    VARP values = valueProj->forward(_Reshape(x, {batch_size * seq_len, mEmbedDim}));
+                    values = _Reshape(values, {batch_size, seq_len, mNumHeads, mHeadDim});
+                    values = _Transpose(values, {0, 2, 1, 3});
+
+                    // Scaled dot-product attention
+                    VARP scores = _MatMul(queries, _Transpose(keys, {0, 1, 3, 2}));
+                    VARP scale = _Scalar(sqrt(static_cast<float>(mHeadDim)));
+                    scores = _Divide(scores, scale);
+
+                    VARP attn_weights = _Softmax(scores, -1);
+                    VARP attn_output = _MatMul(attn_weights, values);
+
+                    // Concatenate attention outputs
+                    attn_output = _Transpose(attn_output, {0, 2, 1, 3});
+                    attn_output = _Reshape(attn_output, {batch_size, seq_len, mEmbedDim});
+
+                    // Final linear projection
+                    VARP output = outProj->forward(attn_output);
+
+                    return {output};
+                }
+
+            private:
+                int mEmbedDim;
+                int mNumHeads;
+                int mHeadDim;
+                std::shared_ptr<Module> queryProj;
+                std::shared_ptr<Module> keyProj;
+                std::shared_ptr<Module> valueProj;
+                std::shared_ptr<Module> outProj;
+            };
+
+            class TransformerBlock : public Module {
+            public:
+                TransformerBlock(int embed_dim, int num_heads, int mlp_dim) {
+                    self_attn = std::make_shared<MultiHeadAttention>(embed_dim, num_heads);
+                    mlp_linear1.reset(NN::Linear(embed_dim, mlp_dim));
+                    mlp_linear2.reset(NN::Linear(mlp_dim, embed_dim));
+//                    norm1 = _LayerNorm(embed_dim);
+//                    mlp = _Sequential({
+//                                              mlp_linear1.reset(NN::Linear(embed_dim, mlp_dim)),
+//                                              _Relu(),
+//                                              mlp_linear2.reset(NN::Linear(mlp_dim, embed_dim))
+//                                      });
+//                    norm2 = _LayerNorm(embed_dim);;
+                }
+
+                virtual std::vector<Express::VARP>  onForward(const std::vector<Express::VARP> &inputs) {
+//                    VARP attn_output = self_attn->forward(x);
+//                    x = norm1->forward(x + attn_output);
+//                    VARP mlp_output = mlp->forward(x);
+//                    x = norm2->forward(x + mlp_output);
+
+                    VARP x = inputs[0];
+//                    VARP attn_output = self_attn->forward(x);
+//                    x = mlp->forward(x + attn_output);
+//                    x = norm1->forward(x + attn_output);
+//                    x = norm2->forward(x + mlp_output);
+                    x = self_attn->forward(x);
+                    x = mlp_linear1->forward(x);
+                    x = mlp_linear2->forward(x);
+                    return {x};
+                }
+
+            private:
+                std::shared_ptr<Module> self_attn;
+//                std::shared_ptr<Module> norm1;
+                std::shared_ptr<Module> mlp;
+                std::shared_ptr<Module> mlp_linear1;
+                std::shared_ptr<Module> mlp_linear2;
+//                std::shared_ptr<Module> norm2;
+            };
 
 
-//// Attention
-class _Attention : public Module {
-public:
-    _Attention(int in_dim, int Attention_dim);
-    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
-    std::shared_ptr<Module> matmul0;
-};
 
-_Attention::_Attention(int hidden_dim, int num_heads) {
-    matmul0.reset(NN::Linear(hidden_dim, hidden_dim*3, true));
-    registerModel({matmul0});
-}
+            ViT::ViT(int img_size, int patch_size, int in_channels, int embed_dim, int num_heads, int mlp_dim, int num_layers, int num_classes) {
+                patch_embed = std::make_shared<PatchEmbedding>(img_size, patch_size, in_channels, embed_dim);
+                for (int i = 0; i < num_layers; ++i) {
+                    transformer_blocks.push_back(std::make_shared<TransformerBlock>(embed_dim, num_heads, mlp_dim));
+                }
+                cls_head.reset(NN::Linear(embed_dim, num_classes));
 
-// TODO: Current working
-std::vector<Express::VARP> _Attention::onForward(const std::vector<Express::VARP> &inputs) {
-    using namespace Express;
-    VARP x = inputs[0];
+                registerModel({patch_embed, cls_head});
+                registerModel(transformer_blocks);
+            }
 
-    x = matmul0->forward(x);
-
-    // yy = _Slice(yy, _Const(sliceStartData, {4}, NCHW), _Const(sliceEndData, {4}, NCHW));
-    auto q = _Slice(x,                       0, _Const(768, {4}, NCHW));
-    auto k = _Slice(x, _Const(768, {4}, NCHW) , _Const(768, {4}, NCHW));
-    auto v = _Slice(x, _Const(1536, {4}, NCHW), _Const(768, {4}, NCHW));
-    q = _Transpose(_Reshape(q, {197, 12, 64}), {1,0,2});
-    k = _Transpose(_Reshape(q, {197, 12, 64}), {1,2,0});
-    v = _Transpose(_Reshape(q, {197, 12, 64}), {1,0,2});
-    q = _Divide(q, _Const(8, {4}, NCHW));
-
-    auto softmax_qk = _Softmax(_MatMul(q, k));
-    x = _MatMul(softmax_qk, v);
-    return {x};
-}
-
-std::shared_ptr<Module> Attention(int hidden_dim, int num_heads) {
-    return std::shared_ptr<Module>(new _Attention(hidden_dim, num_heads));
-}
-
-//// MLPBlock = Linear + GELU + Dropout + Linear + Dropout
-class _MLP : public Module {
-public:
-    _MLP(int in_dim, int mlp_dim);
-
-    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
-
-    std::shared_ptr<Module> linear0;
-    std::shared_ptr<Module> dropout0;
-    std::shared_ptr<Module> linear1;
-    std::shared_ptr<Module> dropout1;
-};
-
-_MLP::_MLP(int in_dim, int mlp_dim) {
-    linear0.reset(NN::Linear(in_dim, mlp_dim));
-    dropout0.reset(NN::Dropout(0.1));
-    linear1.reset(NN::Linear(mlp_dim, in_dim));
-    dropout1.reset(NN::Dropout(0.1));
-
-    registerModel({linear0, dropout0, linear1, dropout1});
-}
-
-std::vector<Express::VARP> _MLP::onForward(const std::vector<Express::VARP> &inputs) {
-    using namespace Express;
-    VARP x = inputs[0];
-
-    x = linear0->forward(x);
-    x = _Gelu(x);
-    x = dropout0->forward(x);
-    x = linear1->forward(x);
-    x = dropout1->forward(x);
-    return {x};
-}
-
-std::shared_ptr<Module> MLP(int in_dim, int mlp_dim) {
-    return std::shared_ptr<Module>(new _MLP(in_dim, mlp_dim));
-}
+            std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inputs) {
+                using namespace std;
+                VARP x = inputs[0];
+                //cout << endl << "DEBUGGING: x dim size1 = " << x->getInfo()->dim.size() << endl;
+                //cout << "DEBUGGING: x shape = " << x->getInfo()->dim.at(0) << " " << x->getInfo()->dim.at(1) << " " << x->getInfo()->dim.at(2) << " " << x->getInfo()->dim.at(3) << endl;
+                x = patch_embed->forward(x);
+                //cout << endl << "DEBUGGING: x dim size2 = " << x->getInfo()->dim.size() << endl;
 
 
-//// EncoderBlock = LayerNorm(Skip) + MultiheadAttention + Dropout + LayerNorm(Skip) + MLPBlock
-class _EncoderBlock:public Module{
-public:
-    _EncoderBlock();
-    virtual std::vector<Express::VARP> onForward(const std::vector<Express::VARP> &inputs) override;
+                for (auto& block : transformer_blocks) {
+                    x = block->forward(x);
+                    //cout << "DEBUGGING: x shape = " << x->getInfo()->dim.at(0) << " " << x->getInfo()->dim.at(1) << " " << x->getInfo()->dim.at(2) << " " << endl;
 
-    std::shared_ptr<Module> dropout_encoder_block;
-    std::shared_ptr<Module> attention_block;
-    std::shared_ptr<Module> mlp_block;
-};
+                }
 
-_EncoderBlock::_EncoderBlock() {
+//                VARP cls_token = _Slice(x, 0, _Const(1, {x->getInfo()->dim[0], 1, x->getInfo()->dim[2]}));
+                x = cls_head->forward(x);
 
-    // LayerNorm(Skip)
-    // MultiheadAttention
-    // Dropout
-    // LayerNorm(Skip)
-    // MLPBlock
-    attention_block = Attention(768, 12);
-    dropout_encoder_block.reset(NN::Dropout(0.1));
-    mlp_block = MLP(768, 3072);
+                //cout << endl << "DEBUGGING: x dim size1 = " << x->getInfo()->dim.size() << endl;
 
-    // registerModel
-    registerModel({attention_block, dropout_encoder_block, mlp_block});
-}
+                //cout << "DEBUGGING: x shape = " << x->getInfo()->dim.at(0) << " " << x->getInfo()->dim.at(1) << " " << x->getInfo()->dim.at(2) << endl;
 
-std::vector<Express::VARP> _EncoderBlock::onForward(const std::vector<Express::VARP> &inputs) {
-    using namespace Express;
-    VARP x = inputs[0];
-    x = attention_block->forward(x);
-    x = mlp_block->forward(x);
-    return {x};
-}
+                return {x};
+            }
 
-std::shared_ptr<Module> EncoderBlock(){
-    return std::shared_ptr<Module>(new _EncoderBlock());
-}
-
-ViT::ViT(int numClasses, int patch_size, int num_layers, int num_heads, int hidden_dim, int mlp_dim) {
-    // 1. conv_proj
-    conv_proj = Conv2d({3, 768}, 16, 16);
-
-    // 2. dropout
-    drop_out.reset(NN::Dropout(0.0));
-
-    // 3. encoder_layers
-    // TODO: Double check the encoder_layer
-    for (int i=0; i<12; i++) {
-        encoder_layers.emplace_back(EncoderBlock());
-    }
-
-    // 4. last_layer_norm. NOTE: Currently we skip LayerNorm temporarily
-
-    // 5. Final Linear Block
-    linear.reset(NN::Linear(768, 1000, true));
-
-    registerModel({conv_proj, drop_out, linear});
-    registerModel(encoder_layers);
-}
-
-std::vector<Express::VARP> ViT::onForward(const std::vector<Express::VARP> &inputs) {
-    using namespace Express;
-    VARP x = inputs[0];
-    x = conv_proj->forward(x);
-    x = drop_out->forward(x);
-    
-    // TODO: To chain blocks
-    for (int i=0; i<12; i++) {
-        x = encoder_layers[i]->forward(x);
-    }
-
-//    3. last_layer_norm. NOTE: Currently we skip LayerNorm temporarily
-//    x = last_layer_norm->forward(x);
-    x = linear->forward(x);
-    return {x};
-}
-
-} // namespace Model
-} // namespace Train
+        } // namespace Model
+    } // namespace Train
 } // namespace MNN

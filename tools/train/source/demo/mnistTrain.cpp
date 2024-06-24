@@ -13,6 +13,10 @@
 #include <vector>
 #include "DemoUnit.hpp"
 #include "Lenet.hpp"
+#include "MobilenetV2.hpp"
+//#include "ResNet.hpp"
+#include "ViT.hpp"
+#include "FSRCNN.hpp"
 #include "MnistUtils.hpp"
 #include "NN.hpp"
 #define MNN_OPEN_TIME_TRACE
@@ -167,10 +171,23 @@ public:
         RandomGenerator::generator(17);
 
         std::string root = argv[1];
-        std::shared_ptr<Module> model(new Lenet);
-        if (argc >= 3) {
-            model.reset(new MnistV2);
+
+        std::shared_ptr<Module> model(new ViT);
+//        std::shared_ptr<Module> model(new FSRCNN);
+//        std::shared_ptr<Module> model(new MobilenetV2);
+        Module::Config mdconfig;
+        mdconfig.rearrange = true; // Reduce net buffer memory
+        {
+            AUTOTIME;
+//            model.reset(Module::load({"input"}, {"output"}, "vit_b_16-train.mnn", &mdconfig));
         }
+
+        // std::shared_ptr<Module> model(new Lenet);
+        // std::shared_ptr<Module> model(new MobilenetV2);
+        // std::shared_ptr<Module> model(new ResNet);
+        // if (argc >= 3) {
+        //     model.reset(new MnistV2);
+        // }
         train(model, root);
         return 0;
     }
